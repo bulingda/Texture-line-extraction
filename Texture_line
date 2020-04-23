@@ -1,0 +1,64 @@
+import cv2
+import numpy as np
+from skimage import restoration, color, morphology
+import time
+from PIL import Image
+from scipy.signal import convolve2d as conv2
+
+
+stime = time.time()
+img = Image.open(r"A:\testdata\44.jpg")
+img_array = np.array(img)
+img1 = img.convert('L')
+L = np.array(img1)
+blurred = cv2.GaussianBlur(L, (3, 3), 0, borderType=cv2.BORDER_REPLICATE)
+# print(blurred, "blurred")
+psf1 = np.ones((5, 5)) / 25
+L1 = conv2(blurred/255, psf1, 'same')
+L1 += 0.1 * L1.std() * np.random.standard_normal(L.shape)
+result1 = restoration.wiener(L1, psf1, 1)
+
+result11 = color.gray2rgb(result1)
+# print(result11, "11")
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+top_pic = cv2.morphologyEx(result1, cv2.MORPH_TOPHAT, kernel)
+dow_pic = cv2.morphologyEx(result1, cv2.MORPH_BLACKHAT, kernel)
+enhance_pic0 = cv2.add(result1, top_pic)
+enhance_pic = cv2.absdiff(enhance_pic0, dow_pic)
+mask = enhance_pic
+# print(enhance_pic, "1")
+h = 1.0
+seed = enhance_pic - h
+h_grade = morphology.reconstruction(seed, mask, method='dilation')
+hdome = enhance_pic - h_grade
+
+ret0, thresh0 = cv2.threshold(np.uint8(hdome * 255),0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+result11 = Image.fromarray(np.uint8(thresh0))
+result11.show()
+sure_bg = cv2.dilate(thresh0, kernel,iterations=3)
+# # print(sure_bg, "sub")
+# # dist_transform = cv2.distanceTransform(thresh0,cv2.DIST_L2,5)
+# # print(dist_transform, "dist")
+# # ret1, sure_fg = cv2.threshold(dist_transform,0.001*dist_transform.max(),255,0)
+# # print(sure_fg, "suf")
+# # sure_fg = np.uint8(sure_fg)
+# # print(sure_fg, "sufnp")
+# # result11 = Image.fromarray(np.uint8(sure_fg))
+# # result11.show()
+unknown = cv2.subtract(sure_bg,thresh0)
+# 输入的是一个二值图像， 输出。。。
+ret2, markers1 = cv2.connectedComponents(thresh0)
+contours, hierarchy = cv2.findContours(thresh0, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+marks0 = np.zeros(img_array.shape[:2], np.int32)
+for index in range(len(contours)):
+    marks0 = cv2.drawContours(marks0, contours, index, (index, index, index), 1)
+markers = markers1 + 1
+markers[unknown==255] = 0
+print(markers,np.min(markers), np.max(marks0), "markers")
+markers2 = cv2.watershed(img_array, marks0)
+img_array[markers2 == -1] = [255, 0, 0]
+# print(img_array)
+result11 = Image.fromarray(np.uint8(img_array))
+result11.show()
+etime = time.time()
+print(etime-stime)
