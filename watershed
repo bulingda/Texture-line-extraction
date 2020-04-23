@@ -76,3 +76,4 @@ cv2.imshow('addWeighted',result)
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+原博客为：https://www.cnblogs.com/zyly/p/9392881.html
